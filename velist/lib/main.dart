@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:velist/features/home/presentation/home_screen.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/database_service.dart';
@@ -12,15 +13,17 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => const Scaffold(
-        body: Center(child: Text("Velist Inbox - Loading...")), // 临时占位
-      ),
+      builder: (context, state) => const HomeScreen(),
     ),
   ],
 );
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化数据库服务 (Hive)
+  final dbService = DatabaseService();
+  await dbService.init(); // ✅ 这一步会自动处理 Web 的 IndexedDB
 
   // 桌面端初始化配置 (Page 5: Desktop Utils)
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
@@ -39,8 +42,12 @@ void main() async {
   }
 
   runApp(
-    const ProviderScope(
-      child: VelistApp(),
+    ProviderScope(
+      overrides: [
+        // 注入已初始化的 Service
+        databaseServiceProvider.overrideWithValue(dbService),
+      ],
+      child: const VelistApp(),
     ),
   );
 }
