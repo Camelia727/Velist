@@ -1,77 +1,133 @@
-import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-// 引入表定义
-import '../models/schema.dart';
-import '../converters/string_list_converter.dart';
+// 引入模型
+import '../models/hive_models.dart';
+// 导出模型供 UI 使用
+export '../models/hive_models.dart';
 
-// 生成文件名
-part 'database_service.g.dart';
+/// 全局数据库服务
+final databaseServiceProvider = Provider<DatabaseService>((ref) {
+  throw UnimplementedError('DatabaseService must be initialized in main.dart');
+});
 
-@DriftDatabase(tables: [Tasks, Settings])
-class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(driftDatabase(name: 'velist_db'));
+class DatabaseService {
+  late Box<Task> _taskBox;
+  late Box<Settings> _settingsBox;
 
-  @override
-  int get schemaVersion => 1;
-  
-  // --- 确保设置存在 ---
-  Future<void> ensureSettingsCreated() async {
-    // ✅ 修复 1: 正确使用 await 获取列表长度
-    final allSettings = await select(settings).get();
-    if (allSettings.isEmpty) {
-      await into(settings).insert(SettingsCompanion.insert());
+  // 初始化 Hive (Web/Native 通用)
+  Future<void> init() async {
+    // 1. 初始化 Flutter 绑定 (自动处理 Web IndexedDB 和 本地路径)
+    await Hive.initFlutter();
+
+    // 2. 注册适配器
+    Hive.registerAdapter(TaskAdapter());
+    Hive.registerAdapter(SettingsAdapter());
+
+    // 3. 打开盒子 (Box)
+    _taskBox = await Hive.openBox<Task>('tasks');
+    _settingsBox = await Hive.openBox<Settings>('settings');
+
+    // 4. 确保设置存在
+    if (_settingsBox.isEmpty) {
+      await _settingsBox.put('config', Settings());
     }
   }
 
   // --- CRUD API ---
 
-  Future<List<Task>> getInboxTasks() {
-    return (select(tasks)
-      ..where((t) => t.isCompleted.equals(false))
-      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-      .get();
+  // 获取 Inbox (未完成，按时间倒序)
+  // Hive 没有 SQL，我们需要在内存中 filter/sort
+  // 对于 Todo App 的数据量（几千条），这在客户端完全没问题。
+  List<Task> getInboxTasks() {
+    final tasks = _taskBox.values
+        .where((t) => !t.isCompleted)
+        .toList();
+    
+    // 排序: 创建时间倒序
+    tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return tasks;
   }
 
-  Stream<List<Task>> watchTodayTasks() {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final tomorrowStart = todayStart.add(const Duration(days: 1));
-
-    return (select(tasks)
-      ..where((t) => t.isCompleted.equals(false) & t.dueDate.isSmallerThanValue(tomorrowStart))
-      ..orderBy([(t) => OrderingTerm.asc(t.dueDate)]))
-      .watch();
+  // 监听数据变化 (Stream)
+  // 根据 Filter 类型返回不同的流
+  Stream<List<Task>> watchTasks(String filterType) {
+    // 监听 Box 变化事件，每次变化重新计算列表
+    return _taskBox.watch().map((_) {
+      return _getTasksByFilter(filterType);
+    }).startWith(_getTasksByFilter(filterType)); // 初始发出一次数据
   }
 
-  Future<int> insertTask(String title, {String? description}) {
-    return into(tasks).insert(TasksCompanion.insert(
+  // 内部辅助方法：根据条件筛选
+  List<Task> _getTasksByFilter(String filterType) {
+    final allTasks = _taskBox.values;
+    List<Task> result = [];
+
+    switch (filterType) {
+      case 'inbox':
+        result = allTasks.where((t) => !t.isCompleted).toList();
+        result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      
+      case 'today':
+        final now = DateTime.now();
+        final startOfDay = DateTime(now.year, now.month, now.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+        
+        result = allTasks.where((t) {
+          if (t.isCompleted) return false;
+          if (t.dueDate == null) return false;
+          return t.dueDate!.isBefore(endOfDay);
+        }).toList();
+        result.sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+        break;
+        
+      case 'upcoming':
+         result = allTasks.where((t) => !t.isCompleted && t.dueDate != null).toList();
+         result.sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+         break;
+
+      case 'completed':
+        result = allTasks.where((t) => t.isCompleted).toList();
+        // 完成时间倒序，如果没有完成时间则用创建时间
+        result.sort((a, b) => (b.completedAt ?? b.createdAt).compareTo(a.completedAt ?? a.createdAt));
+        break;
+    }
+    return result;
+  }
+
+  // 添加任务
+  Future<void> insertTask(String title, {String? description}) async {
+    final newTask = Task(
       uuid: const Uuid().v4(),
       title: title,
-      description: Value(description),
-      tags: [], 
-    ));
+      description: description,
+      createdAt: DateTime.now(),
+      tags: [],
+    );
+    // 使用 uuid 作为 key，或者让 Hive 自动生成 int key
+    // 这里我们直接 add，让 Hive 管理 key
+    await _taskBox.add(newTask);
   }
 
+  // 切换完成状态
   Future<void> toggleTaskCompletion(Task task) async {
-    final newStatus = !task.isCompleted;
-    await (update(tasks)..where((t) => t.id.equals(task.id))).write(
-      TasksCompanion(
-        isCompleted: Value(newStatus),
-        completedAt: Value(newStatus ? DateTime.now() : null),
-      ),
-    );
+    task.isCompleted = !task.isCompleted;
+    task.completedAt = task.isCompleted ? DateTime.now() : null;
+    await task.save(); // HiveObject 自带 save 方法
   }
-  
-  Future<void> deleteTask(int id) {
-    return (delete(tasks)..where((t) => t.id.equals(id))).go();
+
+  // 删除任务
+  Future<void> deleteTask(Task task) async {
+    await task.delete(); // HiveObject 自带 delete 方法
   }
 }
 
-final databaseServiceProvider = Provider<AppDatabase>((ref) {
-  final db = AppDatabase();
-  db.ensureSettingsCreated(); 
-  return db;
-});
+// RxDart 扩展，用于让 Stream 在监听时立即发出当前值 (Polyfill)
+extension StreamStartWith<T> on Stream<T> {
+  Stream<T> startWith(T initial) async* {
+    yield initial;
+    yield* this;
+  }
+}
