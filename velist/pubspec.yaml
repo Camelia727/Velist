@@ -16,9 +16,9 @@ dependencies:
   go_router: ^12.0.0
   
   # --- Database (Local-First) ---
-  isar: ^3.1.0
-  isar_flutter_libs: ^3.1.0 # 包含各平台二进制文件
-  path_provider: ^2.1.1     # 用于获取存储路径
+  drift: ^2.16.0
+  drift_flutter: ^0.1.0        # 官方推荐的简化包 (自动处理 Web/Native)
+  sqlite3_flutter_libs: ^0.5.20 # Native 端 SQLite 二进制
   uuid: ^4.5.2              # 用于生成唯一 ID
 
   # --- UI & Styling ---
@@ -41,4 +41,4 @@ dev_dependencies:
   
   # --- Code Generation ---
   build_runner: ^2.4.6
-  isar_generator: ^3.1.0
+  drift_dev: ^2.16.0

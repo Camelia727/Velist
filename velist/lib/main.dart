@@ -22,10 +22,6 @@ final _router = GoRouter(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化 Isar 数据库
-  final dbService = DatabaseService();
-  await dbService.init();
-
   // 桌面端初始化配置 (Page 5: Desktop Utils)
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     await windowManager.ensureInitialized();
@@ -34,7 +30,7 @@ void main() async {
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.hidden, // 无边框沉浸式，符合 "Focus Mode"
+      titleBarStyle: TitleBarStyle.hidden, // 无边框沉浸式
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
@@ -42,12 +38,11 @@ void main() async {
     });
   }
 
-  runApp(ProviderScope(
-    overrides: [
-      databaseServiceProvider.overrideWithValue(dbService),
-    ],
-    child: const VelistApp()
-  ));
+  runApp(
+    const ProviderScope(
+      child: VelistApp(),
+    ),
+  );
 }
 
 class VelistApp extends StatelessWidget {
