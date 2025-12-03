@@ -2,12 +2,12 @@ name: All Platforms Build
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
     paths-ignore:
       - '**.md'
       - '.gitignore'
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
 
 jobs:
 
