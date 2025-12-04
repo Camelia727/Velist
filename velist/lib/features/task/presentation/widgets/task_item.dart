@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 import '../../../../data/models/hive_models.dart';
 import '../../providers/task_controller.dart';
+import 'task_detail_sheet.dart';
 
 class TaskItem extends ConsumerWidget {
   final Task task;
@@ -23,8 +24,12 @@ class TaskItem extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          // Phase 3.3: 这里预留给详情页弹窗
-          print("Tap item: ${task.title}");
+          showModalBottomSheet(
+            context: context, 
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => TaskDetailSheet(task: task)
+          );
         },
         // 增加圆角，使得点击时的水波纹不溢出
         borderRadius: BorderRadius.circular(12),
