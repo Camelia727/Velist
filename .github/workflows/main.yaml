@@ -32,6 +32,11 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+        # 创建一个临时的 api_keys.dart 文件，包含 GitHub Secrets 里存的密钥
+      - name: Create API Key file
+        run: |
+          echo "class ApiKeys { static const String deepSeekApiKey = '${{ secrets.DEEPSEEK_API_KEY }}'; }" > lib/core/constants/api_keys.dart
+
       - name: Run Build Runner (Hive Adapters)
         run: dart run build_runner build --delete-conflicting-outputs
 
@@ -67,6 +72,10 @@ jobs:
           cache: true
       
       - run: flutter pub get
+
+      - name: Create API Key file
+        run: |
+          echo "class ApiKeys { static const String deepSeekApiKey = '${{ secrets.DEEPSEEK_API_KEY }}'; }" > lib/core/constants/api_keys.dart
       
       - run: dart run build_runner build --delete-conflicting-outputs
       
@@ -108,6 +117,11 @@ jobs:
           cache: true
       
       - run: flutter pub get
+
+      - name: Create API Key file
+        run: |
+          echo "class ApiKeys { static const String deepSeekApiKey = '${{ secrets.DEEPSEEK_API_KEY }}'; }" > lib/core/constants/api_keys.dart
+
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter build apk --release
 
@@ -133,6 +147,12 @@ jobs:
       
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
+
+      - name: Create API Key file
+        shell: bash
+        run: |
+          echo "class ApiKeys { static const String deepSeekApiKey = '${{ secrets.DEEPSEEK_API_KEY }}'; }" > lib/core/constants/api_keys.dart
+
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter build windows --release
       

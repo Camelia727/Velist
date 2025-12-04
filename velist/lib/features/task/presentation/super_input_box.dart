@@ -5,7 +5,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:uuid/uuid.dart';
 import 'package:gap/gap.dart';
 import '../../../data/services/database_service.dart';
-import '../../../data/models/hive_models.dart';
 import '../../task/providers/task_providers.dart'; // 引入 aiServiceProvider
 
 class SuperInputBox extends HookConsumerWidget {
