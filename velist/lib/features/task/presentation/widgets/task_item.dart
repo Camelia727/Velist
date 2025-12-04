@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
-import '../../../../data/services/database_service.dart';
+import '../../../../data/models/hive_models.dart';
+import '../../providers/task_controller.dart';
+import 'task_detail_sheet.dart';
 
 class TaskItem extends ConsumerWidget {
   final Task task;
@@ -12,84 +14,130 @@ class TaskItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isDone = task.isCompleted;
+
+    // 获取控制器
+    final controller = ref.read(taskControllerProvider);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          // 点击整个条目可以进入详情模式（后续实现）
-          // 目前暂时作为切换完成状态
-          _toggleCompletion(ref);
+          showModalBottomSheet(
+            context: context, 
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => TaskDetailSheet(task: task)
+          );
         },
-        borderRadius: BorderRadius.circular(8),
-        hoverColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        // 增加圆角，使得点击时的水波纹不溢出
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          // 增加垂直内边距，让列表呼吸感更强
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. 自定义 Checkbox (圆形，更现代)
-              InkWell(
-                onTap: () => _toggleCompletion(ref),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDone 
-                          ? theme.colorScheme.primary 
-                          : theme.colorScheme.outline.withValues(alpha: 0.5),
-                      width: 2,
+              // 1. 自定义 Checkbox
+              Padding(
+                padding: const EdgeInsets.only(top: 2), 
+                child: InkWell(
+                  onTap: () => controller.toggleTaskCompletion(task),
+                  borderRadius: BorderRadius.circular(20),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDone
+                            ? colorScheme.primary.withValues(alpha: 0.5)
+                            : colorScheme.outline.withValues(alpha: 0.5),
+                        width: 2,
+                      ),
+                      color: isDone ? colorScheme.primary : Colors.transparent,
                     ),
-                    color: isDone ? theme.colorScheme.primary : Colors.transparent,
+                    child: isDone
+                        ? Icon(Icons.check,
+                            size: 16, color: colorScheme.onPrimary)
+                        : null,
                   ),
-                  child: isDone
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
                 ),
               ),
-              
+
               const Gap(16),
 
-              // 2. 任务内容
+              // 2. 任务主体内容
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    // 标题
                     Text(
                       task.title,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         decoration: isDone ? TextDecoration.lineThrough : null,
-                        color: isDone 
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.4) 
-                            : theme.colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
+                        color: isDone
+                            ? colorScheme.onSurface.withValues(alpha: 0.4)
+                            : colorScheme.onSurface,
+                        fontWeight:
+                            isDone ? FontWeight.normal : FontWeight.w500,
+                        height: 1.2,
                       ),
                     ),
-                    // 如果有备注或日期，显示在下面
-                    if (task.description != null || task.dueDate != null) ...[
-                      const Gap(4),
+
+                    // 辅助信息行 (日期 + Tags)
+                    if (task.dueDate != null || task.tags.isNotEmpty) ...[
+                      const Gap(6),
                       Row(
                         children: [
+                          // 日期tag
                           if (task.dueDate != null)
-                            _DateBadge(date: task.dueDate!, hasTime: task.hasTime),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _DateBadge(
+                                date: task.dueDate!,
+                                hasTime: task.hasTime,
+                                isDone: isDone,
+                              ),
+                            ),
+
+                          // Tags 显示
+                          if (task.tags.isNotEmpty)
+                            ...task.tags.map((tag) => Padding(
+                                  padding: const EdgeInsets.only(right: 6.0),
+                                  child: Text(
+                                    "#$tag",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: colorScheme.secondary.withValues(
+                                          alpha: isDone ? 0.4 : 0.8),
+                                    ),
+                                  ),
+                                )),
                         ],
-                      )
-                    ]
+                      ),
+                    ],
+
+                    // 描述 (如果有且不为空)
+                    if (task.description != null &&
+                        task.description!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          task.description!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: isDone ? 0.3 : 0.7),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-              
-              // 3. 删除按钮 (仅悬停或向左滑时显示，简化起见先放这里)
-              // 也可以做成 Invisible Action，只在 Hover 时显示
-              IconButton(
-                icon: Icon(Icons.close, size: 18, color: theme.colorScheme.outline),
-                onPressed: () {
-                  ref.read(databaseServiceProvider).deleteTask(task);
-                },
               ),
             ],
           ),
@@ -97,45 +145,76 @@ class TaskItem extends ConsumerWidget {
       ),
     );
   }
-
-  void _toggleCompletion(WidgetRef ref) {
-    ref.read(databaseServiceProvider).toggleTaskCompletion(task);
-  }
 }
 
-// 小组件：日期徽章
+// ----------------------
+// 内部组件：日期tag
+// ----------------------
 class _DateBadge extends StatelessWidget {
   final DateTime date;
   final bool hasTime;
+  final bool isDone;
 
-  const _DateBadge({required this.date, required this.hasTime});
+  const _DateBadge({
+    required this.date,
+    required this.hasTime,
+    required this.isDone,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isOverdue = date.isBefore(DateTime.now()) && !DateUtils.isSameDay(date, DateTime.now());
-    
-    // 格式化日期：如果是今天显示 "Today", 否则显示 "MM-dd"
+    final colorScheme = theme.colorScheme;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final checkDate = DateTime(date.year, date.month, date.day);
+
+    final isOverdue = checkDate.isBefore(today);
+
+    // 如果任务已完成，日期颜色淡化，不再显示红色警报
+    Color bgColor = colorScheme.surfaceContainerHighest;
+    Color textColor = colorScheme.onSurfaceVariant;
+
     String text;
-    if (DateUtils.isSameDay(date, DateTime.now())) {
+
+    if (checkDate.isAtSameMomentAs(today)) {
       text = hasTime ? DateFormat.Hm().format(date) : 'Today';
+      if (!isDone) {
+        bgColor = colorScheme.primaryContainer;
+        textColor = colorScheme.onPrimaryContainer;
+      }
+    } else if (checkDate.isAtSameMomentAs(tomorrow)) {
+      text = 'Tmrrw'; // 简写
     } else {
       text = DateFormat.MMMd().format(date);
     }
 
+    // 只有在未完成时才处理 Overdue 红色
+    if (isOverdue && !isDone) {
+      bgColor = colorScheme.errorContainer.withValues(alpha: 0.6);
+      textColor = colorScheme.error;
+    }
+
+    // 已完成时，强制变灰
+    if (isDone) {
+      bgColor = Colors.transparent; // 去掉背景
+      textColor = colorScheme.onSurface.withValues(alpha: 0.3); // 纯文本显示
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: isDone
+          ? const EdgeInsets.all(0)
+          : const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: isOverdue 
-            ? theme.colorScheme.errorContainer.withValues(alpha: 0.5) 
-            : theme.colorScheme.surfaceContainerHighest,
+        color: bgColor,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         text,
         style: TextStyle(
           fontSize: 11,
-          color: isOverdue ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant,
+          color: textColor,
           fontWeight: FontWeight.w500,
         ),
       ),
