@@ -38,13 +38,9 @@ class DatabaseService {
   // --- CRUD API ---
 
   // 获取 Inbox (未完成，按时间倒序)
-  // Hive 没有 SQL，我们需要在内存中 filter/sort
-  // 对于 Todo App 的数据量（几千条），这在客户端完全没问题。
   List<Task> getInboxTasks() {
-    final tasks = _taskBox.values
-        .where((t) => !t.isCompleted)
-        .toList();
-    
+    final tasks = _taskBox.values.where((t) => !t.isCompleted).toList();
+
     // 排序: 创建时间倒序
     tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return tasks;
@@ -64,34 +60,56 @@ class DatabaseService {
     final allTasks = _taskBox.values;
     List<Task> result = [];
 
+    // 统一计算时间基准点，避免在循环中重复计算
+    final now = DateTime.now();
+    // 今天凌晨 00:00:00
+    final todayStart = DateTime(now.year, now.month, now.day);
+    // 明天凌晨 00:00:00 (界碑)
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
+
     switch (filterType) {
       case 'inbox':
+        // Inbox 定义：显示所有未完成任务 (也可以修改为只显示没有日期的任务，取决于你的设计哲学)
+        // 目前保持原逻辑：所有未完成
         result = allTasks.where((t) => !t.isCompleted).toList();
+        // 排序：新创建的在上面
         result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
-      
+
       case 'today':
-        final now = DateTime.now();
-        final startOfDay = DateTime(now.year, now.month, now.day);
-        final endOfDay = startOfDay.add(const Duration(days: 1));
-        
+        // Today 定义：
+        // 1. 未完成
+        // 2. 有截止日期
+        // 3. 截止日期在“明天之前” (即：包含今天 + 所有过期任务)
         result = allTasks.where((t) {
-          if (t.isCompleted) return false;
-          if (t.dueDate == null) return false;
-          return t.dueDate!.isBefore(endOfDay);
+          if (t.isCompleted || t.dueDate == null) return false;
+          return t.dueDate!.isBefore(tomorrowStart);
         }).toList();
+        
+        // 排序：日期越早越靠前 (优先处理过期的)
         result.sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
         break;
-        
+
       case 'upcoming':
-         result = allTasks.where((t) => !t.isCompleted && t.dueDate != null).toList();
-         result.sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
-         break;
+        // Upcoming 定义：
+        // 1. 未完成
+        // 2. 有截止日期
+        // 3. 截止日期在“明天及以后” (不包含今天)
+        result = allTasks.where((t) {
+          if (t.isCompleted || t.dueDate == null) return false;
+          // 逻辑：日期 >= 明天凌晨
+          return t.dueDate!.isAtSameMomentAs(tomorrowStart) || t.dueDate!.isAfter(tomorrowStart);
+        }).toList();
+        
+        // 排序：日期越近越靠前
+        result.sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+        break;
 
       case 'completed':
         result = allTasks.where((t) => t.isCompleted).toList();
-        // 完成时间倒序，如果没有完成时间则用创建时间
-        result.sort((a, b) => (b.completedAt ?? b.createdAt).compareTo(a.completedAt ?? a.createdAt));
+        // 排序：最近完成的在最上面
+        result.sort((a, b) => (b.completedAt ?? b.createdAt)
+            .compareTo(a.completedAt ?? a.createdAt));
         break;
     }
     return result;
