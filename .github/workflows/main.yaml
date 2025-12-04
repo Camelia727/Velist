@@ -39,7 +39,14 @@ jobs:
         run: flutter analyze
 
       - name: Run Tests
-        run: flutter test
+        shell: bash
+        run: |
+          if [ -d "test" ]; then
+            echo "Test directory found. Running tests..."
+            flutter test
+          else
+            echo "⚠️ No 'test' directory found. Skipping tests."
+          fi
 
   # ============================================================
   # 阶段 2: 构建与部署 (仅运行于 Push)
