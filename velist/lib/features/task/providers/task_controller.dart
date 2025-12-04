@@ -40,13 +40,11 @@ class TaskController {
       task.description = description;
       hasChanges = true;
     }
-    // 日期处理比较特殊，允许传入 null 来清除日期
+    // 允许传入 null 来清除日期
     if (dueDate != task.dueDate) {
       // 如果传入了值（哪怕是null，如果能区分的话），就更新
-      if (dueDate != null) {
-        task.dueDate = dueDate;
-        hasChanges = true;
-      }
+      task.dueDate = dueDate;
+      hasChanges = true;
     }
 
     if (hasTime != null && hasTime != task.hasTime) {
