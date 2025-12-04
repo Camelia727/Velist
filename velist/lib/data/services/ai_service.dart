@@ -33,7 +33,7 @@ class AIService {
       "title": "任务标题(去除时间/标签词)",
       "dueDate": "ISO8601时间字符串(如2025-12-05T15:00:00)或null",
       "hasTime": true/false(是否有具体时间点),
-      "tags": ["英文标签"]
+      "tags": ["中文标签"]
     }
     ''';
 
@@ -69,6 +69,11 @@ class AIService {
 
       // 这里的 contentStr 应该是一个干净的 JSON 字符串
       final json = jsonDecode(contentStr) as Map<String, dynamic>;
+
+      print(json['title']);
+      print(json['dueDate']);
+      print(json['hasTime']);
+      print(json['tags']);
 
       return ParsedTaskData(
         title: json['title'] ?? input,

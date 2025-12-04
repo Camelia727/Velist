@@ -1,4 +1,5 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:velist/data/services/ai_service.dart';
 import '../../../data/services/database_service.dart';
 
 enum TaskFilter {
@@ -25,3 +26,5 @@ final tasksStreamProvider = StreamProvider.autoDispose<List<Task>>((ref) {
 
   return db.watchTasks(filterKey);
 });
+
+final aiServiceProvider = Provider<AIService>((ref) => AIService());
