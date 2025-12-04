@@ -70,11 +70,6 @@ class AIService {
       // 这里的 contentStr 应该是一个干净的 JSON 字符串
       final json = jsonDecode(contentStr) as Map<String, dynamic>;
 
-      print(json['title']);
-      print(json['dueDate']);
-      print(json['hasTime']);
-      print(json['tags']);
-
       return ParsedTaskData(
         title: json['title'] ?? input,
         dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
