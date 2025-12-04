@@ -111,6 +111,11 @@ class DatabaseService {
     await _taskBox.add(newTask);
   }
 
+  // 直接添加任务对象
+  Future<void> addTask(Task task) async {
+    await _taskBox.add(task);
+  }
+
   // 切换完成状态
   Future<void> toggleTaskCompletion(Task task) async {
     task.isCompleted = !task.isCompleted;
