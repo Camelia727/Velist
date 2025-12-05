@@ -8,6 +8,7 @@ import '../../task/presentation/task_list_view.dart';
 import 'widgets/desktop_sidebar.dart';
 import '../../task/presentation/super_input_box.dart';
 import '../../../core/widgets/window_title_bar.dart';
+import '../../../data/services/sync_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -108,6 +109,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   .onSurface,
                                               letterSpacing: -1.0,
                                             ),
+                                      ),
+                                      const Spacer(),
+                                      // 同步按钮
+                                      IconButton(
+                                        onPressed: () {
+                                          ref.read(syncServiceProvider).sync();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text("Syncing..."),
+                                              duration: Duration(seconds: 1),
+                                            ),
+                                          );
+                                        }, 
+                                        icon: const Icon(Icons.sync),
+                                        tooltip: 'Sync Now',
                                       ),
                                       // 设置入口按钮
                                       IconButton(

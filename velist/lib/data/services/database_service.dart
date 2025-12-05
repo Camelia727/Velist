@@ -163,6 +163,83 @@ class DatabaseService {
     await task.delete();
   }  
 
+  // 获取所有未同步的任务
+  List<Task> getUnsyncedTasks() {
+    return _taskBox.values.where((t) => !t.isSynced).toList();
+  }
+
+  // 批量标记“已同步”
+  Future<void> markTasksAsSynced(List<String> uuids) async {
+    for (var uuid in uuids) {
+      final task = _taskBox.values.firstWhere((t) => t.uuid == uuid);
+      task.isSynced = true;
+      await task.save();
+    }
+  }
+
+  // 保存来自云端的任务
+  Future<void> saveRemoteTask(Map<String, dynamic> remoteData) async {
+    final uuid = remoteData['uuid'] as String;
+    final remoteUpdatedAt = DateTime.parse(remoteData['updated_at']);
+
+    final existingTask = _taskBox.values.cast<Task?>().firstWhere(
+      (t) => t?.uuid == uuid,
+      orElse: () => null,
+    );
+    
+    // 冲突解决：保留最新数据
+    if (existingTask != null) {
+      if (existingTask.updatedAt.isAfter(remoteUpdatedAt)) {
+        return; // 本地数据已更新，无需更新
+      }
+    }
+
+    // 转换数据
+    final newTask = Task(
+      uuid: uuid,
+      title: remoteData['title'],
+      description: remoteData['description'],
+      isCompleted: remoteData['is_completed'] ?? false,
+      completedAt: remoteData['completed_at'] != null 
+          ? DateTime.parse(remoteData['completed_at']) 
+          : null,
+      dueDate: remoteData['due_date'] != null 
+          ? DateTime.parse(remoteData['due_date']) 
+          : null,
+      hasTime: remoteData['has_time'] ?? false,
+      createdAt: DateTime.parse(remoteData['created_at']),
+      updatedAt: remoteUpdatedAt,
+      parentUuid: remoteData['parent_uuid'],
+      tags: remoteData['tags'] != null 
+          ? List<String>.from(remoteData['tags']) 
+          : [],
+      priority: remoteData['priority'] ?? 0,
+      
+      isDeleted: remoteData['is_deleted'] ?? false,
+      isSynced: true, // 标记为已同步
+    );
+
+    if (existingTask != null) {
+      final key = existingTask.key;
+      await _taskBox.put(key, newTask);
+    } else {
+      await _taskBox.add(newTask);
+    }
+  }
+
+  // 获取上次同步时间
+  DateTime? getLastSyncTime() {
+    final settings = getSettings();
+    return settings.lastSyncTime;
+  }
+
+  // 更新上次同步时间
+  Future<void> updateLastSyncTime(DateTime time) async {
+    final settings = getSettings();
+    settings.lastSyncTime = time;
+    await settings.save(); // HiveObject 方法
+  }
+
   // --- Settings API ---
 
   // 获取当前配置

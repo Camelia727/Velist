@@ -99,18 +99,24 @@ class Settings extends HiveObject {
   @HiveField(1)
   bool enableSmartParsing;
 
+  @HiveField(2)
+  DateTime? lastSyncTime;
+
   Settings({
     this.isDarkMode = false,
     this.enableSmartParsing = true,
+    this.lastSyncTime,
   });
 
   Settings copyWith({
     bool? isDarkMode,
     bool? enableSmartParsing,
+    DateTime? lastSyncTime,
   }) {
     return Settings(
       isDarkMode: isDarkMode ?? this.isDarkMode,
       enableSmartParsing: enableSmartParsing ?? this.enableSmartParsing,
+      lastSyncTime: lastSyncTime ?? this.lastSyncTime,
     );
   }
 }
