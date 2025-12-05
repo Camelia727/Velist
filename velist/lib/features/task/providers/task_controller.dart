@@ -6,6 +6,13 @@ final taskControllerProvider = Provider<TaskController>((ref) {
 });
 
 class TaskController {
+
+  // 标记脏数据
+  void _markDirty(Task task) {
+    task.isSynced = false;
+    task.updatedAt = DateTime.now();
+  }
+
   // 切换完成状态
   Future<void> toggleTaskCompletion(Task task) async {
     // 乐观更新：先修改内存对象，UI 会立即响应
@@ -13,12 +20,16 @@ class TaskController {
     task.isCompleted = !wasCompleted;
     task.completedAt = task.isCompleted ? DateTime.now() : null;
 
+    _markDirty(task);
+
     await task.save();
   }
 
   // 删除任务
   Future<void> deleteTask(Task task) async {
-    await task.delete();
+    task.isDeleted = true;
+    _markDirty(task);
+    await task.save();
   }
 
   // 更新任务
@@ -58,6 +69,7 @@ class TaskController {
     }
 
     if (hasChanges) {
+      _markDirty(task);
       await task.save();
     }
   }
