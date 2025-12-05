@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter/services.dart';
 import '../../task/providers/task_providers.dart';
 import '../../task/presentation/task_list_view.dart';
 import 'widgets/desktop_sidebar.dart';
 import '../../task/presentation/super_input_box.dart';
+import '../../../core/widgets/window_title_bar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -59,105 +61,134 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         debugLabel: 'RootFocus',
         child: Scaffold(
           // 点击背景重新聚焦应用
-          body: GestureDetector(
-            onTap: () {
-              // 显式让 RootFocus 重新获得焦点
-              FocusScope.of(context).requestFocus();
-            },
-            behavior: HitTestBehavior.translucent,
-            child: Row(
-              children: [
-                if (isDesktop)
-                  DesktopSidebar(
-                    selectedIndex: currentFilter.index,
-                    onDestinationSelected: (index) {
-                      final filter = TaskFilter.values[index];
-                      ref.read(taskFilterProvider.notifier).state = filter;
-                    },
-                  ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          body: Column(
+            children: [
+              const WindowTitleBar(),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    // 显式让 RootFocus 重新获得焦点
+                    FocusScope.of(context).requestFocus();
+                  },
+                  behavior: HitTestBehavior.translucent,
+                  child: Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 40, 24, 10),
+                      if (isDesktop)
+                        DesktopSidebar(
+                          selectedIndex: currentFilter.index,
+                          onDestinationSelected: (index) {
+                            final filter = TaskFilter.values[index];
+                            ref.read(taskFilterProvider.notifier).state =
+                                filter;
+                          },
+                        ),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              _getFilterTitle(currentFilter),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                    letterSpacing: -1.0,
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(24, 40, 24, 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        _getFilterTitle(currentFilter),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface,
+                                              letterSpacing: -1.0,
+                                            ),
+                                      ),
+                                      // 设置入口按钮
+                                      IconButton(
+                                        icon:
+                                            const Icon(Icons.settings_outlined),
+                                        onPressed: () =>
+                                            context.push('/settings'),
+                                      ),
+                                    ],
                                   ),
-                            ),
-                            const Gap(16),
+                                  const Gap(16),
 
-                            // 触发区域
-                            GestureDetector(
-                              onTap: _showSuperInput,
-                              child: Container(
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest
-                                      .withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.add,
-                                        color: Theme.of(context).hintColor),
-                                    const Gap(12),
-                                    Text(
-                                      "Add a task...",
-                                      style: TextStyle(
-                                          color: Theme.of(context).hintColor,
-                                          fontSize: 16),
-                                    ),
-                                    const Spacer(),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
+                                  // 触发区域
+                                  GestureDetector(
+                                    onTap: _showSuperInput,
+                                    child: Container(
+                                      height: 50,
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).canvasColor,
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                            color:
-                                                Theme.of(context).dividerColor),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Text(
-                                        shortcutLabel,
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).hintColor),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.add,
+                                              color:
+                                                  Theme.of(context).hintColor),
+                                          const Gap(12),
+                                          Text(
+                                            "Add a task...",
+                                            style: TextStyle(
+                                                color:
+                                                    Theme.of(context).hintColor,
+                                                fontSize: 16),
+                                          ),
+                                          const Spacer(),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Theme.of(context).canvasColor,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              border: Border.all(
+                                                  color: Theme.of(context)
+                                                      .dividerColor),
+                                            ),
+                                            child: Text(
+                                              shortcutLabel,
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Theme.of(context)
+                                                      .hintColor),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            const Expanded(
+                              child: TaskListView(),
                             ),
                           ],
                         ),
                       ),
-                      const Expanded(
-                        child: TaskListView(),
-                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              )
+            ],
           ),
+
           bottomNavigationBar: isDesktop
               ? null
               : NavigationBar(

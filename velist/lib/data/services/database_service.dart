@@ -145,6 +145,41 @@ class DatabaseService {
   Future<void> deleteTask(Task task) async {
     await task.delete(); // HiveObject 自带 delete 方法
   }
+
+  // 切换主题
+  Future<void> toggleTheme() async {
+    final currentConfig = _settingsBox.get('config')!;
+    currentConfig.isDarkMode = !currentConfig.isDarkMode;
+    await _settingsBox.put('config', currentConfig);
+  }
+
+  // --- Settings API ---
+
+  // 获取当前配置
+  Settings getSettings() {
+    // 确保有默认值
+    if (_settingsBox.isEmpty) {
+      _settingsBox.put('config', Settings());
+    }
+    return _settingsBox.get('config')!;
+  }
+
+  // 更新整个配置对象
+  Future<void> updateSettings(Settings newSettings) async {
+    await _settingsBox.put('config', newSettings);
+  }
+
+  Future<void> updateTheme(bool isDark) async {
+    final current = getSettings();
+    current.isDarkMode = isDark;
+    await current.save(); // HiveObject 方法
+  }
+
+  Future<void> updateSmartParsing(bool isEnabled) async {
+    final current = getSettings();
+    current.enableSmartParsing = isEnabled;
+    await current.save();
+  }
 }
 
 // RxDart 扩展，用于让 Stream 在监听时立即发出当前值 (Polyfill)

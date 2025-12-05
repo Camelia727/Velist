@@ -69,4 +69,14 @@ class Settings extends HiveObject {
     this.isDarkMode = false,
     this.enableSmartParsing = true,
   });
+
+  Settings copyWith({
+    bool? isDarkMode,
+    bool? enableSmartParsing,
+  }) {
+    return Settings(
+      isDarkMode: isDarkMode ?? this.isDarkMode,
+      enableSmartParsing: enableSmartParsing ?? this.enableSmartParsing,
+    );
+  }
 }

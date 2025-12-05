@@ -5,7 +5,8 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:uuid/uuid.dart';
 import 'package:gap/gap.dart';
 import '../../../data/services/database_service.dart';
-import '../../task/providers/task_providers.dart'; // 引入 aiServiceProvider
+import '../../task/providers/task_providers.dart';
+import '../../settings/providers/settings_provider.dart';
 
 class SuperInputBox extends HookConsumerWidget {
   const SuperInputBox({super.key});
@@ -25,6 +26,10 @@ class SuperInputBox extends HookConsumerWidget {
         platform == TargetPlatform.windows ||
         platform == TargetPlatform.linux;
 
+    // 是否开启 AI 解析
+    final settings = ref.watch(settingsProvider);
+    final isAiEnabled = settings.enableSmartParsing;
+
     // 自动聚焦
     useEffect(() {
       focusNode.requestFocus();
@@ -43,32 +48,42 @@ class SuperInputBox extends HookConsumerWidget {
       isProcessing.value = true;
 
       try {
-        // --- 核心变化：调用 AI 解析 ---
-        // 调用 Provider 获取解析结果
-        final parsedData = await ref.read(aiServiceProvider).parseTask(text);
-        
-        // ---------------------------
+        if (!isAiEnabled) {
+          // 没有开启 AI 解析，直接保存
+          final newTask = Task(
+            uuid: const Uuid().v4(),
+            title: text,
+            description: null,
+            dueDate: null,
+            hasTime: false,
+            tags: const [],
+            createdAt: DateTime.now(),
+            isCompleted: false,
+            priority: 0,
+          );
+          await ref.read(databaseServiceProvider).addTask(newTask);
+        } else {
+          // 调用 Provider 获取解析结果
+          final parsedData = await ref.read(aiServiceProvider).parseTask(text);
 
-        // 3. 构建 Task 对象 (使用解析后的数据)
-        final newTask = Task(
-          uuid: const Uuid().v4(),
-          title: parsedData.title,     // 使用 AI 提取的标题
-          description: null,           // 暂时为空，后续可扩展
-          dueDate: parsedData.dueDate, // 使用 AI 提取的日期
-          hasTime: parsedData.hasTime, // 使用 AI 判断的时间标记
-          tags: parsedData.tags,       // 使用 AI 提取的标签
-          createdAt: DateTime.now(),
-          isCompleted: false,
-          priority: 0,
-        );
-
-        // 4. 持久化
-        await ref.read(databaseServiceProvider).addTask(newTask);
+          final newTask = Task(
+            uuid: const Uuid().v4(),
+            title: parsedData.title, // 使用 AI 提取的标题
+            description: null, // 暂时为空，后续可扩展
+            dueDate: parsedData.dueDate, // 使用 AI 提取的日期
+            hasTime: parsedData.hasTime, // 使用 AI 判断的时间标记
+            tags: parsedData.tags, // 使用 AI 提取的标签
+            createdAt: DateTime.now(),
+            isCompleted: false,
+            priority: 0,
+          );
+          await ref.read(databaseServiceProvider).addTask(newTask);
+        }
 
         // 5. 交互反馈
         if (keepOpen) {
           controller.clear();
-          // 如果想给用户一点反馈，可以在这里加个微小的震动 HapticFeedback.lightImpact();
+          HapticFeedback.lightImpact();
         } else {
           if (context.mounted) {
             Navigator.of(context).pop();
@@ -94,8 +109,8 @@ class SuperInputBox extends HookConsumerWidget {
             if (!isProcessing.value) ...{
               const SingleActivator(LogicalKeyboardKey.enter, meta: true): () =>
                   handleSubmit(keepOpen: true),
-              const SingleActivator(LogicalKeyboardKey.enter, control: true): () =>
-                  handleSubmit(keepOpen: true),
+              const SingleActivator(LogicalKeyboardKey.enter, control: true):
+                  () => handleSubmit(keepOpen: true),
               const SingleActivator(LogicalKeyboardKey.escape): () =>
                   Navigator.of(context).pop(),
             }
@@ -125,7 +140,7 @@ class SuperInputBox extends HookConsumerWidget {
                   controller: controller,
                   focusNode: focusNode,
                   // 当正在处理时，禁止输入，变成只读
-                  enabled: !isProcessing.value, 
+                  enabled: !isProcessing.value,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w500,
                       ),
@@ -141,7 +156,7 @@ class SuperInputBox extends HookConsumerWidget {
                   onSubmitted: (_) => handleSubmit(keepOpen: false),
                   textInputAction: TextInputAction.done,
                 ),
-                
+
                 const Gap(16),
 
                 // 底部状态栏：正常提示 vs Loading 动画
@@ -176,9 +191,9 @@ class SuperInputBox extends HookConsumerWidget {
         Text(
           "AI is thinking...", // 这里体现 Invisible AI 的存在感
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
         ),
       ],
     );
