@@ -28,13 +28,16 @@ class TaskAdapter extends TypeAdapter<Task> {
       parentUuid: fields[8] as String?,
       tags: (fields[9] as List).cast<String>(),
       priority: fields[10] as int,
+      updatedAt: fields[11] as DateTime?,
+      isSynced: fields[12] == null ? false : fields[12] as bool,
+      isDeleted: fields[13] == null ? false : fields[13] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, Task obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.uuid)
       ..writeByte(1)
@@ -56,7 +59,13 @@ class TaskAdapter extends TypeAdapter<Task> {
       ..writeByte(9)
       ..write(obj.tags)
       ..writeByte(10)
-      ..write(obj.priority);
+      ..write(obj.priority)
+      ..writeByte(11)
+      ..write(obj.updatedAt)
+      ..writeByte(12)
+      ..write(obj.isSynced)
+      ..writeByte(13)
+      ..write(obj.isDeleted);
   }
 
   @override
@@ -83,17 +92,20 @@ class SettingsAdapter extends TypeAdapter<Settings> {
     return Settings(
       isDarkMode: fields[0] as bool,
       enableSmartParsing: fields[1] as bool,
+      lastSyncTime: fields[2] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Settings obj) {
     writer
-      ..writeByte(2)
+      ..writeByte(3)
       ..writeByte(0)
       ..write(obj.isDarkMode)
       ..writeByte(1)
-      ..write(obj.enableSmartParsing);
+      ..write(obj.enableSmartParsing)
+      ..writeByte(2)
+      ..write(obj.lastSyncTime);
   }
 
   @override

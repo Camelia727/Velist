@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter/services.dart';
+import 'package:velist/features/home/presentation/widgets/sync_indicator.dart';
 import '../../task/providers/task_providers.dart';
 import '../../task/presentation/task_list_view.dart';
 import 'widgets/desktop_sidebar.dart';
@@ -109,6 +110,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               letterSpacing: -1.0,
                                             ),
                                       ),
+                                      const Spacer(),
+                                      // 同步状态指示器
+                                      const SyncIndicator(),
+                                      const Gap(8),
                                       // 设置入口按钮
                                       IconButton(
                                         icon:

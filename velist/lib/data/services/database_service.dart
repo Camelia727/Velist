@@ -21,6 +21,10 @@ class DatabaseService {
     // 1. 初始化 Flutter 绑定 (自动处理 Web IndexedDB 和 本地路径)
     await Hive.initFlutter();
 
+    // 删除旧数据库（调试用） 
+    // await Hive.deleteBoxFromDisk('tasks');
+    // await Hive.deleteBoxFromDisk('settings');
+
     // 2. 注册适配器
     Hive.registerAdapter(TaskAdapter());
     Hive.registerAdapter(SettingsAdapter());
@@ -37,13 +41,10 @@ class DatabaseService {
 
   // --- CRUD API ---
 
-  // 获取 Inbox (未完成，按时间倒序)
-  List<Task> getInboxTasks() {
-    final tasks = _taskBox.values.where((t) => !t.isCompleted).toList();
-
-    // 排序: 创建时间倒序
-    tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return tasks;
+  // 标记任务为脏数据
+  void _markDirty(Task task) {
+    task.isSynced = false;
+    task.updatedAt = DateTime.now();
   }
 
   // 监听数据变化 (Stream)
@@ -67,11 +68,13 @@ class DatabaseService {
     // 明天凌晨 00:00:00 (界碑)
     final tomorrowStart = todayStart.add(const Duration(days: 1));
 
+    final activeTasks = allTasks.where((t) => !t.isDeleted);
+
     switch (filterType) {
       case 'inbox':
         // Inbox 定义：显示所有未完成任务 (也可以修改为只显示没有日期的任务，取决于你的设计哲学)
         // 目前保持原逻辑：所有未完成
-        result = allTasks.where((t) => !t.isCompleted).toList();
+        result = activeTasks.where((t) => !t.isCompleted).toList();
         // 排序：新创建的在上面
         result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
@@ -81,7 +84,7 @@ class DatabaseService {
         // 1. 未完成
         // 2. 有截止日期
         // 3. 截止日期在“明天之前” (即：包含今天 + 所有过期任务)
-        result = allTasks.where((t) {
+        result = activeTasks.where((t) {
           if (t.isCompleted || t.dueDate == null) return false;
           return t.dueDate!.isBefore(tomorrowStart);
         }).toList();
@@ -95,7 +98,7 @@ class DatabaseService {
         // 1. 未完成
         // 2. 有截止日期
         // 3. 截止日期在“明天及以后” (不包含今天)
-        result = allTasks.where((t) {
+        result = activeTasks.where((t) {
           if (t.isCompleted || t.dueDate == null) return false;
           // 逻辑：日期 >= 明天凌晨
           return t.dueDate!.isAtSameMomentAs(tomorrowStart) || t.dueDate!.isAfter(tomorrowStart);
@@ -106,7 +109,7 @@ class DatabaseService {
         break;
 
       case 'completed':
-        result = allTasks.where((t) => t.isCompleted).toList();
+        result = activeTasks.where((t) => t.isCompleted).toList();
         // 排序：最近完成的在最上面
         result.sort((a, b) => (b.completedAt ?? b.createdAt)
             .compareTo(a.completedAt ?? a.createdAt));
@@ -117,11 +120,15 @@ class DatabaseService {
 
   // 添加任务
   Future<void> insertTask(String title, {String? description}) async {
+    final now = DateTime.now();
     final newTask = Task(
       uuid: const Uuid().v4(),
       title: title,
       description: description,
-      createdAt: DateTime.now(),
+      createdAt: now,
+      updatedAt: now,
+      isSynced: false,
+      isDeleted: false,
       tags: [],
     );
     // 使用 uuid 作为 key，或者让 Hive 自动生成 int key
@@ -138,19 +145,99 @@ class DatabaseService {
   Future<void> toggleTaskCompletion(Task task) async {
     task.isCompleted = !task.isCompleted;
     task.completedAt = task.isCompleted ? DateTime.now() : null;
+
+    _markDirty(task); // 标记为脏数据
+
     await task.save(); // HiveObject 自带 save 方法
   }
 
-  // 删除任务
+  // 软删除任务
   Future<void> deleteTask(Task task) async {
-    await task.delete(); // HiveObject 自带 delete 方法
+    task.isDeleted = true;
+    _markDirty(task); // 标记为脏数据
+    await task.save();
   }
 
-  // 切换主题
-  Future<void> toggleTheme() async {
-    final currentConfig = _settingsBox.get('config')!;
-    currentConfig.isDarkMode = !currentConfig.isDarkMode;
-    await _settingsBox.put('config', currentConfig);
+  // 物理删除（清空回收站 / 解决冲突）
+  Future<void> hardDeleteTask(Task task) async {
+    await task.delete();
+  }  
+
+  // 获取所有未同步的任务
+  List<Task> getUnsyncedTasks() {
+    return _taskBox.values.where((t) => !t.isSynced).toList();
+  }
+
+  // 批量标记“已同步”
+  Future<void> markTasksAsSynced(List<String> uuids) async {
+    for (var uuid in uuids) {
+      final task = _taskBox.values.firstWhere((t) => t.uuid == uuid);
+      task.isSynced = true;
+      await task.save();
+    }
+  }
+
+  // 保存来自云端的任务
+  Future<void> saveRemoteTask(Map<String, dynamic> remoteData) async {
+    final uuid = remoteData['uuid'] as String;
+    final remoteUpdatedAt = DateTime.parse(remoteData['updated_at']);
+
+    final existingTask = _taskBox.values.cast<Task?>().firstWhere(
+      (t) => t?.uuid == uuid,
+      orElse: () => null,
+    );
+    
+    // 冲突解决：保留最新数据
+    if (existingTask != null) {
+      if (existingTask.updatedAt.isAfter(remoteUpdatedAt)) {
+        return; // 本地数据已更新，无需更新
+      }
+    }
+
+    // 转换数据
+    final newTask = Task(
+      uuid: uuid,
+      title: remoteData['title'],
+      description: remoteData['description'],
+      isCompleted: remoteData['is_completed'] ?? false,
+      completedAt: remoteData['completed_at'] != null 
+          ? DateTime.parse(remoteData['completed_at']) 
+          : null,
+      dueDate: remoteData['due_date'] != null 
+          ? DateTime.parse(remoteData['due_date']) 
+          : null,
+      hasTime: remoteData['has_time'] ?? false,
+      createdAt: DateTime.parse(remoteData['created_at']),
+      updatedAt: remoteUpdatedAt,
+      parentUuid: remoteData['parent_uuid'],
+      tags: remoteData['tags'] != null 
+          ? List<String>.from(remoteData['tags']) 
+          : [],
+      priority: remoteData['priority'] ?? 0,
+      
+      isDeleted: remoteData['is_deleted'] ?? false,
+      isSynced: true, // 标记为已同步
+    );
+
+    if (existingTask != null) {
+      final key = existingTask.key;
+      await _taskBox.put(key, newTask);
+    } else {
+      await _taskBox.add(newTask);
+    }
+  }
+
+  // 获取上次同步时间
+  DateTime? getLastSyncTime() {
+    final settings = getSettings();
+    return settings.lastSyncTime;
+  }
+
+  // 更新上次同步时间
+  Future<void> updateLastSyncTime(DateTime time) async {
+    final settings = getSettings();
+    settings.lastSyncTime = time;
+    await settings.save(); // HiveObject 方法
   }
 
   // --- Settings API ---
@@ -167,6 +254,13 @@ class DatabaseService {
   // 更新整个配置对象
   Future<void> updateSettings(Settings newSettings) async {
     await _settingsBox.put('config', newSettings);
+  }
+
+  // 切换主题
+  Future<void> toggleTheme() async {
+    final currentConfig = _settingsBox.get('config')!;
+    currentConfig.isDarkMode = !currentConfig.isDarkMode;
+    await _settingsBox.put('config', currentConfig);
   }
 
   Future<void> updateTheme(bool isDark) async {
