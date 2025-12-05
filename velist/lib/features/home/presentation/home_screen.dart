@@ -3,12 +3,12 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter/services.dart';
+import 'package:velist/features/home/presentation/widgets/sync_indicator.dart';
 import '../../task/providers/task_providers.dart';
 import '../../task/presentation/task_list_view.dart';
 import 'widgets/desktop_sidebar.dart';
 import '../../task/presentation/super_input_box.dart';
 import '../../../core/widgets/window_title_bar.dart';
-import '../../../data/services/sync_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -111,20 +111,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             ),
                                       ),
                                       const Spacer(),
-                                      // 同步按钮
-                                      IconButton(
-                                        onPressed: () {
-                                          ref.read(syncServiceProvider).sync();
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text("Syncing..."),
-                                              duration: Duration(seconds: 1),
-                                            ),
-                                          );
-                                        }, 
-                                        icon: const Icon(Icons.sync),
-                                        tooltip: 'Sync Now',
-                                      ),
+                                      // 同步状态指示器
+                                      const SyncIndicator(),
+                                      const Gap(8),
                                       // 设置入口按钮
                                       IconButton(
                                         icon:

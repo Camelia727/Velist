@@ -4,28 +4,33 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database_service.dart';
 import 'auth_service.dart';
 
+enum SyncStatus { idle, syncing, error, success }
+
+final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
+
 final syncServiceProvider = Provider<SyncService>((ref) {
   final db = ref.watch(databaseServiceProvider);
   final auth = ref.watch(authServiceProvider);
-  return SyncService(db, auth);
+  return SyncService(db, auth, ref);
 });
 
 class SyncService {
   final DatabaseService _db;
   final AuthService _auth;
+  final Ref _ref;
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  bool _isSyncing = false;
-
-  SyncService(this._db, this._auth);
+  SyncService(this._db, this._auth, this._ref);
 
   /// 执行完整同步 (Push + Pull)
   Future<void> sync() async {
     final user = _auth.currentUser;
     if (user == null) return; // 未登录不需同步
-    if (_isSyncing) return;   // 防止重复触发
 
-    _isSyncing = true;
+    final currentStatus = _ref.read(syncStatusProvider);
+    if (currentStatus == SyncStatus.syncing) return;   // 防止重复触发
+
+    _updateSyncStatus(SyncStatus.syncing);
     debugPrint("🔄 Sync Started...");
 
     try {
@@ -39,13 +44,20 @@ class SyncService {
       await _db.updateLastSyncTime(DateTime.now().toUtc());
       
       debugPrint("✅ Sync Completed.");
+
+      _updateSyncStatus(SyncStatus.success);
+
+      Future.delayed(const Duration(seconds: 2), () {
+        _updateSyncStatus(SyncStatus.idle);
+      });
     } catch (e) {
       debugPrint("❌ Sync Failed: $e");
-      // 这里可以加一个 Toast 或者 Snackbar 通知用户同步失败
-      // 但在服务层最好不要直接操作 UI
-    } finally {
-      _isSyncing = false;
+      _updateSyncStatus(SyncStatus.error);
     }
+  }
+
+  void _updateSyncStatus(SyncStatus status) {
+    _ref.read(syncStatusProvider.notifier).state = status;
   }
 
   Future<void> _pushLocalChanges(String userId) async {
