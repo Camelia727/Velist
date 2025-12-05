@@ -3,13 +3,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
+import 'core/constants/supabase_constants.dart';
 import 'data/services/database_service.dart';
 import 'router/app_router.dart';
 import 'features/settings/providers/settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化 Supabase
+  await Supabase.initialize(
+    url: SupabaseConstants.url, 
+    anonKey: SupabaseConstants.anonKey
+  );
 
   // 初始化数据库服务 (Hive)
   final dbService = DatabaseService();

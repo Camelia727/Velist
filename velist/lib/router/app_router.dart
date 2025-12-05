@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:velist/features/auth/presentation/auth_page.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/settings/presentation/settings_page.dart'; 
 
@@ -16,6 +17,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         builder: (context, state) => const SettingsPage()
       ),
+      GoRoute(
+        path: '/auth',
+        builder: (context, state) => const AuthPage(),
+      )
     ],
   );
 });
